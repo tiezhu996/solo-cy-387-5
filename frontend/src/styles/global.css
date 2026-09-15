@@ -9,3 +9,14 @@ body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #f6f8fb
 .full { width: 100%; }
 .map-panel, .repair { margin: 20px 0; padding: 18px; border: 1px solid #d7dee8; background: white; border-radius: 8px; }
 .repair { display: grid; grid-template-columns: 120px 1fr 120px auto; gap: 12px; align-items: center; }
+.app-nav { display: flex; align-items: center; gap: 20px; max-width: 1180px; margin: 0 auto; padding: 16px 24px 0; }
+.app-nav .brand { font-weight: 800; font-size: 18px; color: #2563eb; }
+.action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0; align-items: start; }
+.action-grid .el-card { border-radius: 10px; }
+.action-grid .tip { margin-bottom: 12px; }
+.records { margin: 24px 0; }
+.records-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.records-head h2 { margin: 0; }
+.code { font-weight: 700; letter-spacing: 2px; color: #d4380d; }
+.muted { color: #9aa6b8; }
+@media (max-width: 720px) { .repair { grid-template-columns: 1fr; } }

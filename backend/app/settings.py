@@ -6,6 +6,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-secret')
 DEBUG = os.getenv('DJANGO_DEBUG', 'true') == 'true'
 ALLOWED_HOSTS = ['*']
+LANGUAGE_CODE = 'zh-hans'
+USE_TZ = True
 
 INSTALLED_APPS = [
     'django.contrib.auth',
@@ -16,6 +18,7 @@ INSTALLED_APPS = [
     'app.apps.booking',
     'app.apps.contract',
     'app.apps.repair',
+    'app.apps.packages',
 ]
 
 MIDDLEWARE = ['django.middleware.common.CommonMiddleware', 'app.middleware.request_log.RequestLogMiddleware']
