@@ -30,8 +30,10 @@ def register_package(data: dict) -> Package:
         room_no=data.get('roomNo', ''),
         status=PACKAGE_STATUS_REGISTERED,
     )
+    # atomic 形成保存点：唯一键冲突时只回滚到保存点，不污染外层事务
     try:
-        package.save()
+        with transaction.atomic():
+            package.save()
     except IntegrityError:
         logger.info('快递单号重复登记：%s', data['trackingNo'])
         raise BusinessError(ERROR_MESSAGES[PACKAGE_DUPLICATE], PACKAGE_DUPLICATE)

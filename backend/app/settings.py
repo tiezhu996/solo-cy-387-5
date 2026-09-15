@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 import dj_database_url
 
@@ -24,6 +25,14 @@ INSTALLED_APPS = [
 MIDDLEWARE = ['django.middleware.common.CommonMiddleware', 'app.middleware.request_log.RequestLogMiddleware']
 ROOT_URLCONF = 'app.urls'
 DATABASES = {'default': dj_database_url.config(default=os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3'))}
+# SQLite 并发写入时等待写锁而非立即报错（PostgreSQL 由行锁串行化，无需此项）
+if DATABASES['default'].get('ENGINE', '').endswith('sqlite3'):
+    DATABASES['default'].setdefault('OPTIONS', {})['timeout'] = 20
+    # 测试使用临时文件库：内存共享缓存库在多线程并发写时会立即抛“table is locked”，
+    # 文件库则走 busy timeout 串行化，可正确验证并发取件竞态。
+    DATABASES['default'].setdefault('TEST', {})['NAME'] = os.path.join(
+        tempfile.gettempdir(), 'rentfind_test.sqlite3'
+    )
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'

@@ -35,6 +35,18 @@ cd backend && python -m venv venv && source venv/bin/activate && pip install -r 
 cd frontend && npm install && npm run dev
 ```
 
+## 运行测试
+
+快递代收模块的测试基于 Django 测试框架，自动建库与清理数据，可重复运行：
+
+```bash
+cd backend
+python manage.py test app.apps.packages     # 仅快递模块
+python manage.py test                       # 全部测试
+```
+
+覆盖：登记（含重复单号、缺参）、入库生成 6 位凭证（含幂等、单号不存在）、正常取件、错误凭证、无效单号、取件后重复操作（取件时间不被改写）、待取件/待入库/已取件列表查询，以及并发取件竞态——同一待取件包裹被 8 个请求同时取走时仅一次成功，其余返回 `PACKAGE_ALREADY_PICKED`，最终状态与取件时间一致。
+
 ## 技术栈
 
 | 模块 | 技术 |
