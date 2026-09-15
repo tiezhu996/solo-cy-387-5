@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from app.constants.enums import PACKAGE_STATUS_PICKED, PACKAGE_STATUS_REGISTERED, PACKAGE_STATUS_STORED
@@ -63,25 +63,47 @@ def store_package(data: dict) -> Package:
 
 
 def pickup_package(tracking_no: str, pickup_code: str) -> Package:
-    """取件：核对凭证并推进状态为已取件。"""
+    """取件：核对凭证并推进状态为已取件。
+
+    并发安全：校验通过后用一条带 `status=待取件` 条件的原子 UPDATE 抢占。
+    数据库行锁（PostgreSQL）/写锁（SQLite）会串行化并发请求，
+    仅一条 UPDATE 能命中；其余请求更新 0 行并返回“重复取件”，不会重复成功。
+    """
+    pickup_code = pickup_code.strip()
     package = Package.objects.filter(tracking_no=tracking_no).first()
     if package is None:
         raise BusinessError(ERROR_MESSAGES[PACKAGE_NOT_FOUND], PACKAGE_NOT_FOUND, 404)
-
     if package.status == PACKAGE_STATUS_PICKED:
         logger.info('重复取件 no=%s', tracking_no)
         raise BusinessError(ERROR_MESSAGES[PACKAGE_ALREADY_PICKED], PACKAGE_ALREADY_PICKED)
     if package.status != PACKAGE_STATUS_STORED or not package.pickup_code:
         raise BusinessError(ERROR_MESSAGES[PACKAGE_STATUS_INVALID], PACKAGE_STATUS_INVALID)
-    if pickup_code.strip() != package.pickup_code:
+    if pickup_code != package.pickup_code:
         logger.info('凭证不符 no=%s input=%s', tracking_no, pickup_code)
         raise BusinessError(ERROR_MESSAGES[INVALID_PICKUP_CODE], INVALID_PICKUP_CODE)
 
-    package.status = PACKAGE_STATUS_PICKED
-    package.picked_at = timezone.now()
-    package.save()
-    logger.info('快递取件成功 id=%s no=%s', package.id, package.tracking_no)
-    return package
+    picked_at = timezone.now()
+    with transaction.atomic():
+        updated = Package.objects.filter(
+            id=package.id,
+            status=PACKAGE_STATUS_STORED,
+            pickup_code=pickup_code,
+        ).update(status=PACKAGE_STATUS_PICKED, picked_at=picked_at)
+
+        if updated == 1:
+            package.status = PACKAGE_STATUS_PICKED
+            package.picked_at = picked_at
+            logger.info('快递取件成功 id=%s no=%s', package.id, package.tracking_no)
+            return package
+
+        # 更新 0 行：并发下已被其它请求取走（或凭证/状态在期间变化），重新读取以给出明确错误
+        fresh = Package.objects.filter(id=package.id).first()
+        if fresh is not None and fresh.status == PACKAGE_STATUS_PICKED:
+            logger.info('并发重复取件 no=%s', tracking_no)
+            raise BusinessError(ERROR_MESSAGES[PACKAGE_ALREADY_PICKED], PACKAGE_ALREADY_PICKED)
+        if fresh is not None and fresh.pickup_code != pickup_code:
+            raise BusinessError(ERROR_MESSAGES[INVALID_PICKUP_CODE], INVALID_PICKUP_CODE)
+        raise BusinessError(ERROR_MESSAGES[PACKAGE_STATUS_INVALID], PACKAGE_STATUS_INVALID)
 
 
 def list_packages(state: str = ''):
